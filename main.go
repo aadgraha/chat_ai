@@ -47,7 +47,7 @@ type ChatRequest struct {
 	ChatID string `json:"chat_id"`
 }
 
-func TextPrompt(chatRequest ChatRequest, cache *gcache.Cache) *genai.GenerateContentResponse {
+func TextPrompt(chatRequest ChatRequest, cache *gcache.Cache) string {
 	geminiApiKey := os.Getenv("GEMINI_API_KEY")
 	modelName := os.Getenv("MODEL_NAME")
 	ctx := context.Background()
@@ -66,11 +66,12 @@ func TextPrompt(chatRequest ChatRequest, cache *gcache.Cache) *genai.GenerateCon
 	if err != nil {
 		log.Fatal(err)
 	}
-	aiResponse, err := json.Marshal(resp.Candidates[0].Content.Parts[0])
-	newAIContext := aiContext.(string) + "\nUser: " + chatRequest.Prompt + "\nAI: " + string(aiResponse)
+	json, err := json.Marshal(resp.Candidates[0].Content.Parts[0])
+	aiResponse := string(json)
+	newAIContext := aiContext.(string) + "\nUser: " + chatRequest.Prompt + "\nAI: " + aiResponse
 	cache.Set(chatRequest.ChatID, newAIContext, gcache.DefaultExpiration)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return resp
+	return aiResponse
 }
