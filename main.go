@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/joho/godotenv"
+	gcache "github.com/patrickmn/go-cache"
 	"google.golang.org/api/option"
 )
 
@@ -17,10 +20,8 @@ func main() {
 		log.Fatal(err)
 	}
 	app := fiber.New()
-	ctx := context.Background()
-	geminiApiKey := os.Getenv("GEMINI_API_KEY")
 	port := os.Getenv("PORT")
-	client, err := genai.NewClient(ctx, option.WithAPIKey(geminiApiKey))
+	cache := gcache.New(5*time.Minute, 10*time.Minute)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,8 +31,7 @@ func main() {
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 		}
-		aiResponse := TextPrompt(chatrequest, client, ctx)
-
+		aiResponse := TextPrompt(chatrequest, cache)
 		response := fiber.Map{"message": aiResponse}
 		return c.JSON(response)
 	})
@@ -44,12 +44,31 @@ func main() {
 
 type ChatRequest struct {
 	Prompt string `json:"prompt"`
+	ChatID string `json:"chat_id"`
 }
 
-func TextPrompt(chatRequest ChatRequest, client *genai.Client, ctx context.Context) *genai.GenerateContentResponse {
+func TextPrompt(chatRequest ChatRequest, cache *gcache.Cache) *genai.GenerateContentResponse {
+	geminiApiKey := os.Getenv("GEMINI_API_KEY")
 	modelName := os.Getenv("MODEL_NAME")
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(geminiApiKey))
+	if err != nil {
+		log.Fatal(err)
+	}
 	model := client.GenerativeModel(modelName)
-	resp, err := model.GenerateContent(ctx, genai.Text(chatRequest.Prompt))
+	aiContext, found := cache.Get(chatRequest.ChatID)
+	if !found {
+		aiContext = "default context"
+	}
+	prompt := aiContext.(string) + "\nUser: " + chatRequest.Prompt + "\nAI:"
+	defer client.Close()
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		log.Fatal(err)
+	}
+	aiResponse, err := json.Marshal(resp.Candidates[0].Content.Parts[0])
+	newAIContext := aiContext.(string) + "\nUser: " + chatRequest.Prompt + "\nAI: " + string(aiResponse)
+	cache.Set(chatRequest.ChatID, newAIContext, gcache.DefaultExpiration)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -6,6 +6,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/google/generative-ai-go v0.19.0
 	github.com/joho/godotenv v1.5.1
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	google.golang.org/api v0.186.0
 )
 
