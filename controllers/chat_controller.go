@@ -34,5 +34,6 @@ func (cc *ChatController) HandleChat(c *fiber.Ctx) error {
 
 	return c.JSON(models.ChatResponse{
 		Message: aiResponse,
+		ChatID:  chatRequest.ChatID,
 	})
 }

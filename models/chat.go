@@ -7,4 +7,5 @@ type ChatRequest struct {
 
 type ChatResponse struct {
 	Message string `json:"message"`
+	ChatID string `json:"chat_id"`
 }
